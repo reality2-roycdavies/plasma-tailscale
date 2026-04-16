@@ -14,6 +14,7 @@ PlasmoidItem {
     property var tsInfo: ({})
     property bool hasData: false
     property bool tsConnected: hasData && (tsInfo.connected === true)
+    property var sshUsers: ({})
 
     property string copiedText: ""
 
@@ -35,59 +36,125 @@ PlasmoidItem {
         root.copiedText = text
         copiedTimer.restart()
     }
-    function openSsh(dnsName) {
-        runCommand("nohup konsole -e ssh " + dnsName + " >/dev/null 2>&1 &")
+    readonly property string credentialsFile: {
+        var url = Qt.resolvedUrl("../tools/credentials.json").toString()
+        return url.replace("file://", "")
     }
-    function openVnc(dnsName, vncType) {
-        if (vncType === "realvnc") {
-            runCommand("nohup vncviewer " + dnsName + " >/dev/null 2>&1 &")
-        } else {
-            runCommand("nohup remmina -c vnc://" + dnsName + " >/dev/null 2>&1 &")
+    property var credentials: ({})
+
+    // Load saved credentials
+    P5Support.DataSource {
+        id: credLoader
+        engine: "executable"
+        connectedSources: ["cat '" + root.credentialsFile + "' 2>/dev/null || echo '{}'"]
+        onNewData: function(source, data) {
+            if (data["exit code"] == 0 && data["stdout"].length > 0) {
+                try {
+                    root.credentials = JSON.parse(data["stdout"])
+                } catch(e) {}
+            }
         }
     }
-    function openRdp(dnsName) {
-        // Generate a Remmina profile with GFX pipeline disabled to avoid interlacing on ARM
-        var profile = "/tmp/tailscale-rdp-" + dnsName.replace(/[^a-zA-Z0-9]/g, "_") + ".remmina"
-        var cmd = "cat > " + profile + " << 'EOF'\n"
-            + "[remmina]\n"
-            + "name=" + dnsName + "\n"
-            + "protocol=RDP\n"
-            + "server=" + dnsName + "\n"
-            + "colordepth=32\n"
-            + "quality=2\n"
-            + "glyph-cache=true\n"
-            + "network=lan\n"
-            + "gfx=false\n"
-            + "rfx=false\n"
-            + "disableautoreconnect=0\n"
-            + "EOF\n"
-            + "nohup remmina -c " + profile + " >/dev/null 2>&1 &"
-        runCommand(cmd)
+
+    function getSavedCreds(service, dnsName) {
+        var key = service + ":" + dnsName
+        return root.credentials[key] || {}
     }
-    function openNomachine(ip, dnsName) {
-        // Generate a temp .nxs session file and open it
-        var nxsFile = "/tmp/tailscale-nx-" + dnsName.replace(/[^a-zA-Z0-9]/g, "_") + ".nxs"
-        var cmd = "cat > " + nxsFile + " << 'NXEOF'\n"
-            + '<!DOCTYPE NXClientSettings>\n'
-            + '<NXClientSettings version=\"2.3\" application=\"nxclient\" >\n'
-            + ' <group name=\"General\" >\n'
-            + '  <option key=\"Connection service\" value=\"nx\" />\n'
-            + '  <option key=\"NoMachine daemon port\" value=\"4000\" />\n'
-            + ' </group>\n'
-            + ' <group name=\"Local Settings\" >\n'
-            + '  <option key=\"Server name\" value=\"' + dnsName + '\" />\n'
-            + '  <option key=\"List of hosts\" value=\"' + ip + '\" />\n'
-            + '  <option key=\"List of ports\" value=\"4000\" />\n'
-            + '  <option key=\"List of protocols\" value=\"nx\" />\n'
-            + ' </group>\n'
-            + ' <group name=\"Login\" >\n'
-            + '  <option key=\"Server authentication method\" value=\"system\" />\n'
-            + '  <option key=\"System login method\" value=\"password\" />\n'
-            + ' </group>\n'
-            + '</NXClientSettings>\n'
-            + "NXEOF\n"
-            + "nohup /usr/NX/bin/nxplayer --session " + nxsFile + " >/dev/null 2>&1 &"
-        runCommand(cmd)
+
+    function saveCreds(service, dnsName, creds) {
+        var key = service + ":" + dnsName
+        var all = root.credentials
+        all[key] = creds
+        root.credentials = all
+        runCommand("echo '" + JSON.stringify(all).replace(/'/g, "'\\''") + "' > '" + credentialsFile + "'")
+    }
+
+    property string pendingService: ""
+    property string pendingHost: ""
+    property string pendingIp: ""
+    property string pendingUsername: ""
+    property string pendingPassword: ""
+
+    function showConnectDialog(service, dnsName, ip) {
+        var saved = getSavedCreds(service, dnsName)
+        root.pendingService = service
+        root.pendingHost = dnsName
+        root.pendingIp = ip || ""
+        root.pendingUsername = saved.username || ""
+        root.pendingPassword = saved.password || ""
+    }
+    function cancelConnect() {
+        root.pendingService = ""
+    }
+
+    function doConnect(service, dnsName, ip, username, password, remember) {
+        if (remember) {
+            var creds = {"username": username}
+            if (password) creds.password = password
+            saveCreds(service, dnsName, creds)
+        }
+
+        if (service === "ssh") {
+            var target = username ? (username + "@" + dnsName) : dnsName
+            runCommand("nohup konsole -e ssh " + target + " >/dev/null 2>&1 &")
+        } else if (service === "rdp") {
+            var profile = "/tmp/tailscale-rdp-" + dnsName.replace(/[^a-zA-Z0-9]/g, "_") + ".remmina"
+            var cmd = "cat > " + profile + " << 'EOF'\n"
+                + "[remmina]\n"
+                + "name=" + dnsName + "\n"
+                + "protocol=RDP\n"
+                + "server=" + dnsName + "\n"
+                + "username=" + username + "\n"
+                + "password=" + password + "\n"
+                + "colordepth=32\n"
+                + "quality=2\n"
+                + "glyph-cache=true\n"
+                + "network=lan\n"
+                + "gfx=false\n"
+                + "rfx=false\n"
+                + "disableautoreconnect=0\n"
+                + "EOF\n"
+                + "nohup remmina -c " + profile + " >/dev/null 2>&1 &"
+            runCommand(cmd)
+        } else if (service === "vnc") {
+            var vncType = ""
+            // Find vnc_type from peers
+            for (var i = 0; i < peerModel.count; i++) {
+                if (peerModel.get(i).pDnsName === dnsName) {
+                    vncType = peerModel.get(i).pVncType
+                    break
+                }
+            }
+            if (vncType === "realvnc") {
+                runCommand("nohup vncviewer " + dnsName + " >/dev/null 2>&1 &")
+            } else {
+                runCommand("nohup remmina -c vnc://" + (username ? (username + "@") : "") + dnsName + " >/dev/null 2>&1 &")
+            }
+        } else if (service === "nomachine") {
+            var nxsFile = "/tmp/tailscale-nx-" + dnsName.replace(/[^a-zA-Z0-9]/g, "_") + ".nxs"
+            var nxCmd = "cat > " + nxsFile + " << 'NXEOF'\n"
+                + '<!DOCTYPE NXClientSettings>\n'
+                + '<NXClientSettings version=\"2.3\" application=\"nxclient\" >\n'
+                + ' <group name=\"General\" >\n'
+                + '  <option key=\"Connection service\" value=\"nx\" />\n'
+                + '  <option key=\"NoMachine daemon port\" value=\"4000\" />\n'
+                + ' </group>\n'
+                + ' <group name=\"Local Settings\" >\n'
+                + '  <option key=\"Server name\" value=\"' + dnsName + '\" />\n'
+                + '  <option key=\"List of hosts\" value=\"' + ip + '\" />\n'
+                + '  <option key=\"List of ports\" value=\"4000\" />\n'
+                + '  <option key=\"List of protocols\" value=\"nx\" />\n'
+                + ' </group>\n'
+                + ' <group name=\"Login\" >\n'
+                + '  <option key=\"Server authentication method\" value=\"system\" />\n'
+                + '  <option key=\"System login method\" value=\"password\" />\n'
+                + '  <option key=\"User\" value=\"' + username + '\" />\n'
+                + ' </group>\n'
+                + '</NXClientSettings>\n'
+                + "NXEOF\n"
+                + "nohup /usr/NX/bin/nxplayer --session " + nxsFile + " >/dev/null 2>&1 &"
+            runCommand(nxCmd)
+        }
     }
     function openInBrowser(dnsName) {
         Qt.openUrlExternally("http://" + dnsName)
@@ -182,18 +249,128 @@ PlasmoidItem {
         onClicked: root.expanded = !root.expanded
     }
 
-    fullRepresentation: QQC2.ScrollView {
-        id: scrollView
+    fullRepresentation: Item {
+        id: fullRoot
         Layout.minimumWidth: Kirigami.Units.gridUnit * 18
         Layout.preferredWidth: Kirigami.Units.gridUnit * 18
         Layout.preferredHeight: Kirigami.Units.gridUnit * 22
         Layout.maximumHeight: Kirigami.Units.gridUnit * 30
 
-        QQC2.ScrollBar.horizontal.policy: QQC2.ScrollBar.AlwaysOff
+        // Credentials overlay (shown when pendingService is set)
+        Rectangle {
+            anchors.fill: parent
+            z: 10
+            visible: root.pendingService !== ""
+            color: Kirigami.Theme.backgroundColor
 
-        ColumnLayout {
-            width: scrollView.availableWidth
-            spacing: Kirigami.Units.smallSpacing
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: Kirigami.Units.largeSpacing
+                spacing: Kirigami.Units.largeSpacing
+
+                PlasmaExtras.Heading {
+                    level: 3
+                    Layout.fillWidth: true
+                    text: {
+                        var labels = {"ssh": "SSH", "rdp": "RDP", "vnc": "VNC", "nomachine": "NoMachine"}
+                        return (labels[root.pendingService] || root.pendingService) + " connect"
+                    }
+                }
+                PlasmaComponents.Label {
+                    Layout.fillWidth: true
+                    text: root.pendingHost
+                    elide: Text.ElideRight
+                    opacity: 0.7
+                }
+
+                Kirigami.Separator { Layout.fillWidth: true }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    PlasmaComponents.Label { text: "Username"; Layout.preferredWidth: Kirigami.Units.gridUnit * 5 }
+                    QQC2.TextField {
+                        id: userField
+                        Layout.fillWidth: true
+                        text: root.pendingUsername
+                        placeholderText: "username"
+                        onTextChanged: root.pendingUsername = text
+                        Keys.onReturnPressed: {
+                            var needsPass = root.pendingService === "rdp" || root.pendingService === "vnc"
+                            if (needsPass && passField.text === "")
+                                passField.forceActiveFocus()
+                            else
+                                connectBtn.clicked()
+                        }
+                    }
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    visible: root.pendingService === "rdp" || root.pendingService === "vnc"
+                    PlasmaComponents.Label { text: "Password"; Layout.preferredWidth: Kirigami.Units.gridUnit * 5 }
+                    QQC2.TextField {
+                        id: passField
+                        Layout.fillWidth: true
+                        text: root.pendingPassword
+                        echoMode: TextInput.Password
+                        placeholderText: "password"
+                        onTextChanged: root.pendingPassword = text
+                        Keys.onReturnPressed: connectBtn.clicked()
+                    }
+                }
+
+                QQC2.CheckBox {
+                    id: rememberCheck
+                    text: "Remember"
+                    checked: true
+                }
+
+                Item { Layout.fillHeight: true }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    QQC2.Button {
+                        text: "Cancel"
+                        Layout.fillWidth: true
+                        onClicked: root.cancelConnect()
+                    }
+                    QQC2.Button {
+                        id: connectBtn
+                        text: "Connect"
+                        Layout.fillWidth: true
+                        highlighted: true
+                        onClicked: {
+                            var svc = root.pendingService
+                            var host = root.pendingHost
+                            var ip = root.pendingIp
+                            var u = userField.text
+                            var p = passField.text
+                            var remember = rememberCheck.checked
+                            root.cancelConnect()
+                            root.doConnect(svc, host, ip, u, p, remember)
+                        }
+                    }
+                }
+            }
+
+            onVisibleChanged: {
+                if (visible) {
+                    userField.forceActiveFocus()
+                    userField.selectAll()
+                }
+            }
+        }
+
+        QQC2.ScrollView {
+            id: scrollView
+            anchors.fill: parent
+            visible: root.pendingService === ""
+
+            QQC2.ScrollBar.horizontal.policy: QQC2.ScrollBar.AlwaysOff
+
+            ColumnLayout {
+                width: scrollView.availableWidth
+                spacing: Kirigami.Units.smallSpacing
 
             // Header
             PlasmaExtras.Heading {
@@ -449,7 +626,7 @@ PlasmoidItem {
                         implicitWidth: Kirigami.Units.iconSizes.medium
                         implicitHeight: Kirigami.Units.iconSizes.medium
                         PlasmaComponents.ToolTip { text: "SSH to " + model.pDnsName }
-                        onClicked: root.openSsh(model.pDnsName)
+                        onClicked: root.showConnectDialog("ssh", model.pDnsName, model.pIp)
                     }
 
                     // VNC
@@ -461,7 +638,7 @@ PlasmoidItem {
                         implicitWidth: Kirigami.Units.iconSizes.medium
                         implicitHeight: Kirigami.Units.iconSizes.medium
                         PlasmaComponents.ToolTip { text: "VNC to " + model.pDnsName }
-                        onClicked: root.openVnc(model.pDnsName, model.pVncType)
+                        onClicked: root.showConnectDialog("vnc", model.pDnsName, model.pIp)
                     }
 
                     // RDP
@@ -473,7 +650,7 @@ PlasmoidItem {
                         implicitWidth: Kirigami.Units.iconSizes.medium
                         implicitHeight: Kirigami.Units.iconSizes.medium
                         PlasmaComponents.ToolTip { text: "RDP to " + model.pDnsName }
-                        onClicked: root.openRdp(model.pDnsName)
+                        onClicked: root.showConnectDialog("rdp", model.pDnsName, model.pIp)
                     }
 
                     // NoMachine
@@ -485,7 +662,7 @@ PlasmoidItem {
                         implicitWidth: Kirigami.Units.iconSizes.medium
                         implicitHeight: Kirigami.Units.iconSizes.medium
                         PlasmaComponents.ToolTip { text: "NoMachine to " + model.pDnsName }
-                        onClicked: root.openNomachine(model.pIp, model.pDnsName)
+                        onClicked: root.showConnectDialog("nomachine", model.pDnsName, model.pIp)
                     }
 
                     // HTTP/browser
@@ -514,7 +691,8 @@ PlasmoidItem {
                 }
             }
 
-            Item { Layout.fillHeight: true }
+                Item { Layout.fillHeight: true }
+            }
         }
     }
 }
