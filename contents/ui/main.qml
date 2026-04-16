@@ -253,8 +253,8 @@ PlasmoidItem {
         id: fullRoot
         Layout.minimumWidth: Kirigami.Units.gridUnit * 18
         Layout.preferredWidth: Kirigami.Units.gridUnit * 18
-        Layout.preferredHeight: Kirigami.Units.gridUnit * 22
-        Layout.maximumHeight: Kirigami.Units.gridUnit * 30
+        Layout.preferredHeight: Kirigami.Units.gridUnit * 32
+        Layout.maximumHeight: Kirigami.Units.gridUnit * 40
 
         // Credentials overlay (shown when pendingService is set)
         Rectangle {
@@ -373,11 +373,23 @@ PlasmoidItem {
                 spacing: Kirigami.Units.smallSpacing
 
             // Header
-            PlasmaExtras.Heading {
-                level: 3
-                text: "Tailscale"
+            RowLayout {
                 Layout.fillWidth: true
                 Layout.margins: Kirigami.Units.smallSpacing
+                PlasmaExtras.Heading {
+                    level: 3
+                    text: "Tailscale"
+                    Layout.fillWidth: true
+                }
+                PlasmaComponents.ToolButton {
+                    icon.name: "configure"
+                    icon.width: Kirigami.Units.iconSizes.smallMedium
+                    icon.height: Kirigami.Units.iconSizes.smallMedium
+                    implicitWidth: Kirigami.Units.iconSizes.medium
+                    implicitHeight: Kirigami.Units.iconSizes.medium
+                    PlasmaComponents.ToolTip { text: "Open Tailscale admin console" }
+                    onClicked: Qt.openUrlExternally("https://login.tailscale.com/admin/machines")
+                }
             }
 
             Kirigami.Separator { Layout.fillWidth: true }
@@ -420,9 +432,15 @@ PlasmoidItem {
                 Layout.leftMargin: Kirigami.Units.largeSpacing
                 Layout.rightMargin: Kirigami.Units.smallSpacing
                 visible: root.tsConnected
-                PlasmaComponents.Label { text: "Hostname"; Layout.fillWidth: true }
+                PlasmaComponents.Label { text: "Name"; Layout.fillWidth: true }
                 PlasmaComponents.Label {
-                    text: root.tsInfo.hostname || "N/A"
+                    text: {
+                        var dns = root.tsInfo.dns_name || ""
+                        var tsName = dns ? dns.split(".")[0] : ""
+                        var host = root.tsInfo.hostname || ""
+                        if (tsName && host && tsName !== host) return tsName + " (" + host + ")"
+                        return tsName || host || "N/A"
+                    }
                 }
             }
             RowLayout {
