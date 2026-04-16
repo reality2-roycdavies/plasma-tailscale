@@ -20,6 +20,15 @@ Built for a Raspberry Pi 5 (CM5 in Argon One laptop case) running Raspberry Pi O
   - **HTTPS** copy to clipboard
 - **Click to copy** — click any peer name or DNS name row to copy the full domain to clipboard
 
+## Prerequisites
+
+Install and configure [Tailscale](https://tailscale.com/download) first:
+
+```bash
+curl -fsSL https://tailscale.com/install.sh | sh
+sudo tailscale up
+```
+
 ## Dependencies
 
 - KDE Plasma 6
