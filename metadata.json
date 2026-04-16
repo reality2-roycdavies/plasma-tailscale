@@ -1,0 +1,20 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "Roy C. Davies"
+            }
+        ],
+        "Category": "System Information",
+        "Description": "Monitor and status display for Tailscale VPN",
+        "EnabledByDefault": true,
+        "FormFactors": ["desktop"],
+        "Icon": "network-vpn",
+        "Id": "org.tailscale.monitor",
+        "License": "GPL-2.0+",
+        "Name": "Tailscale Monitor"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "X-Plasma-NotificationAreaCategory": "Hardware"
+}

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-64 -64 640 640">
+  <!-- Tailscale logo: disconnected state - all dots at low opacity -->
+  <!-- Row 1 -->
+  <circle cx="65.6" cy="63.9" r="63.9" fill="#ffffff" opacity="0.15"/>
+  <circle cx="257.2" cy="63.9" r="63.9" fill="#ffffff" opacity="0.15"/>
+  <circle cx="446.4" cy="63.9" r="63.9" fill="#ffffff" opacity="0.15"/>
+  <!-- Row 2 -->
+  <circle cx="65.6" cy="254.2" r="63.9" fill="#ffffff" opacity="0.15"/>
+  <circle cx="257.2" cy="254.2" r="63.9" fill="#ffffff" opacity="0.15"/>
+  <circle cx="446.4" cy="254.2" r="63.9" fill="#ffffff" opacity="0.15"/>
+  <!-- Row 3 -->
+  <circle cx="65.6" cy="448.1" r="63.9" fill="#ffffff" opacity="0.15"/>
+  <circle cx="257.2" cy="448.1" r="63.9" fill="#ffffff" opacity="0.15"/>
+  <circle cx="446.4" cy="448.1" r="63.9" fill="#ffffff" opacity="0.15"/>
+</svg>

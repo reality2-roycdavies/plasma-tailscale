@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-64 -64 640 640">
+  <!-- Tailscale logo: 3x3 grid of dots, active dots at full opacity, inactive at 20% -->
+  <!-- Row 1 -->
+  <circle cx="65.6" cy="63.9" r="63.9" fill="#ffffff" opacity="0.2"/>
+  <circle cx="257.2" cy="63.9" r="63.9" fill="#ffffff" opacity="0.2"/>
+  <circle cx="446.4" cy="63.9" r="63.9" fill="#ffffff" opacity="0.2"/>
+  <!-- Row 2 (active) -->
+  <circle cx="65.6" cy="254.2" r="63.9" fill="#ffffff"/>
+  <circle cx="257.2" cy="254.2" r="63.9" fill="#ffffff"/>
+  <circle cx="446.4" cy="254.2" r="63.9" fill="#ffffff"/>
+  <!-- Row 3 -->
+  <circle cx="65.6" cy="448.1" r="63.9" fill="#ffffff" opacity="0.2"/>
+  <circle cx="257.2" cy="448.1" r="63.9" fill="#ffffff"/>
+  <circle cx="446.4" cy="448.1" r="63.9" fill="#ffffff" opacity="0.2"/>
+</svg>
