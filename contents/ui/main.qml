@@ -632,12 +632,15 @@ PlasmoidItem {
                     // VNC
                     PlasmaComponents.ToolButton {
                         visible: model.pHasVnc
-                        icon.name: "krdc"
+                        icon.name: model.pVncType === "realvnc" ? "" : "krdc"
+                        icon.source: model.pVncType === "realvnc" ? Qt.resolvedUrl("../icons/realvnc.png") : ""
                         icon.width: Kirigami.Units.iconSizes.smallMedium
                         icon.height: Kirigami.Units.iconSizes.smallMedium
                         implicitWidth: Kirigami.Units.iconSizes.medium
                         implicitHeight: Kirigami.Units.iconSizes.medium
-                        PlasmaComponents.ToolTip { text: "VNC to " + model.pDnsName }
+                        PlasmaComponents.ToolTip {
+                            text: (model.pVncType === "realvnc" ? "RealVNC to " : "VNC to ") + model.pDnsName
+                        }
                         onClicked: root.showConnectDialog("vnc", model.pDnsName, model.pIp)
                     }
 
@@ -656,7 +659,7 @@ PlasmoidItem {
                     // NoMachine
                     PlasmaComponents.ToolButton {
                         visible: model.pHasNomachine
-                        icon.name: "preferences-desktop-remote-desktop"
+                        icon.source: Qt.resolvedUrl("../icons/nomachine.png")
                         icon.width: Kirigami.Units.iconSizes.smallMedium
                         icon.height: Kirigami.Units.iconSizes.smallMedium
                         implicitWidth: Kirigami.Units.iconSizes.medium
